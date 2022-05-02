@@ -130,6 +130,31 @@ def main():
     # Save Image
     cv2.imwrite(folder_name+"Opt_Therm_Match_SIFT-"+str(timestamp) +".png", opt_therm_match_sift)
 
+    #------- HOMOGRAPHY -------#
+    src_pts_sift = np.float32([ kp1_sift[m.queryIdx].pt for m in matches_sift ]).reshape(-1,1,2)
+    dst_pts_sift = np.float32([ kp2_sift[m.trainIdx].pt for m in matches_sift ]).reshape(-1,1,2)
+    M_sift, mask_sift = cv2.findHomography(src_pts_sift, dst_pts_sift, cv2.RANSAC) # MODIFIED
+    print("SIFT Homography: \n" + str(M_sift))
+    
+
+    #------- REDRAW INLIERS -------#
+    # 1. Draw all matches in red
+    opt_therm_match_sift = cv2.drawMatches(rgb_optical_original,kp1_sift,rgb_thermal_original,kp2_sift,matches_sift, None,
+                                matchColor = (0,0,255),       # draw matches in red color
+                                )
+    # 2. Draw inliers in green 
+    w = int(opt_therm_match_sift.shape[1]/2)
+    opt_therm_match_sift = cv2.drawMatches(opt_therm_match_sift[:,:w,:],kp1_sift,opt_therm_match_sift[:,w:,:],kp2_sift,matches_sift, None,
+                                matchColor = (0,255,0),       # draw matches in green color
+                                matchesMask = mask_sift[:,0],  # draw only inliers
+                                )
+
+    # Show images
+    cv2.imshow('SIFT Inliers and Outliers - ' + str(timestamp), opt_therm_match_sift)
+    cv2.waitKey()
+
+    # Save Image
+    cv2.imwrite(folder_name+"Opt_Therm_Match_SIFT_Inliers_Outliers-"+str(timestamp) +".png", opt_therm_match_sift)
 
     #-----#
     # ORB # 
@@ -183,6 +208,31 @@ def main():
 
     # Save Image
     cv2.imwrite(folder_name+"Opt_Therm_Match_ORB-"+str(timestamp) +".png", opt_therm_match_orb)
+
+    #------- HOMOGRAPHY -------#
+    src_pts_orb = np.float32([ kp1_orb[m.queryIdx].pt for m in matches_orb ]).reshape(-1,1,2)
+    dst_pts_orb = np.float32([ kp2_orb[m.trainIdx].pt for m in matches_orb ]).reshape(-1,1,2)
+    M_orb, mask_orb = cv2.findHomography(src_pts_orb, dst_pts_orb, cv2.RANSAC)
+    print("ORB Homography: \n" + str(M_orb))
+
+    #------- REDRAW INLIERS -------#
+    # 1. Draw all matches in red
+    opt_therm_match_orb = cv2.drawMatches(rgb_optical_original,kp1_orb,rgb_thermal_original,kp2_orb, matches_orb, None,
+                                matchColor = (0,0,255), # draw matches in red color
+                                )
+    # 2. Draw inliers in green 
+    w = int(opt_therm_match_orb.shape[1]/2)
+    opt_therm_match_orb = cv2.drawMatches(opt_therm_match_orb[:,:w,:],kp1_orb,opt_therm_match_orb[:,w:,:],kp2_orb,matches_orb, None,
+                                matchColor = (0,255,0),       # draw matches in green color
+                                matchesMask = mask_orb[:,0],  # draw only inliers
+                                )
+
+    # Show images
+    cv2.imshow('ORB Inliers and Outliers - ' + str(timestamp), opt_therm_match_orb)
+    cv2.waitKey()
+
+    # Save Image
+    cv2.imwrite(folder_name+"Opt_Therm_Match_ORB_Inliers_Outliers-"+str(timestamp) +".png", opt_therm_match_orb)
 
 
 
