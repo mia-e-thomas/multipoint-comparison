@@ -81,6 +81,10 @@ def main():
     # Save
     cv2.imwrite(folder_name+"Opt_Therm_Stacked-"+str(timestamp) +".png", opt_therm_stack_original)
 
+    #------#
+    # SIFT # 
+    #------#
+
     #------- SIFT -------#
     # Instantiate SIFT detector
     # Default Params:
@@ -93,38 +97,43 @@ def main():
     sift = cv2.SIFT_create(contrastThreshold=0.12, edgeThreshold=20) # MODIFIED PARAMS
 
     # Find SIFT keypoints and descriptors
-    kp1, des1 = sift.detectAndCompute(rgb_optical_original,None)
-    kp2, des2 = sift.detectAndCompute(rgb_thermal_original,None)
+    kp1_sift, des1_sift = sift.detectAndCompute(rgb_optical_original,None)
+    kp2_sift, des2_sift = sift.detectAndCompute(rgb_thermal_original,None)
 
     # Instantiate Brute Force Matcher with default parameters
     # Default Params:
     # normType = NORM_L2 (use NORM_L2 for sift/surf & NORM_HAMMING for orb, brief, brisk)
     # crossCheck = False <--- If true, only returns "mutual best match" (i best for j AND j best for i)
-    bf = cv2.BFMatcher(crossCheck = True)
+    bf_sift = cv2.BFMatcher(crossCheck = True)
 
     # Find matches with Brute Force
-    matches = bf.match(des1,des2)
+    matches_sift = bf_sift.match(des1_sift,des2_sift)
 
     # Sort matches in order of distance
-    matches = sorted(matches, key = lambda x:x.distance)
+    matches_sift = sorted(matches_sift, key = lambda x:x.distance)
 
     # Take only the first 'n' matches (default all when param is zero)
-    if args.num_matches: matches = matches[:args.num_matches]
+    if args.num_matches: matches_sift = matches_sift[:args.num_matches]
 
     # Draw matches
-    opt_therm_sift_match = cv2.drawMatches(rgb_optical_original,kp1,
-                                rgb_thermal_original,kp2,
-                                matches,None,
+    opt_therm_match_sift = cv2.drawMatches(
+                                rgb_optical_original,kp1_sift,
+                                rgb_thermal_original,kp2_sift,
+                                matches_sift,None,
                                 # flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
                                 )
 
     # Show images
-    cv2.imshow('Opt-Therm Match SIFT - ' + str(timestamp), opt_therm_sift_match)
+    cv2.imshow('Opt-Therm Match SIFT - ' + str(timestamp), opt_therm_match_sift)
     cv2.waitKey()
 
-    # TODO: save images???
+    # Save Image
+    cv2.imwrite(folder_name+"Opt_Therm_Match_SIFT-"+str(timestamp) +".png", opt_therm_match_sift)
 
-    #==================================================
+
+    #-----#
+    # ORB # 
+    #-----#
 
     #------- ORB -------#
     # Instantiate ORB detector
@@ -142,36 +151,38 @@ def main():
     orb = cv2.ORB_create(edgeThreshold = 91, patchSize = 60, fastThreshold= 20) # MODIFIED PARAMETERS 
 
     # Find SIFT keypoints and descriptors
-    kp1, des1 = orb.detectAndCompute(rgb_optical_original,None)
-    kp2, des2 = orb.detectAndCompute(rgb_thermal_original,None)
+    kp1_orb, des1_orb = orb.detectAndCompute(rgb_optical_original,None)
+    kp2_orb, des2_orb = orb.detectAndCompute(rgb_thermal_original,None)
 
     # Instantiate Brute Force Matcher with default parameters
     # Default Params:
     # normType = NORM_L2 (use NORM_L2 for sift/surf & NORM_HAMMING for orb, brief, brisk)
     # crossCheck = False <--- If true, only returns "mutual best match" (i best for j AND j best for i)
-    bf = cv2.BFMatcher(normType = cv2.NORM_HAMMING, crossCheck = True)
+    bf_orb = cv2.BFMatcher(normType = cv2.NORM_HAMMING, crossCheck = True)
 
     # Find matches with Brute Force
-    matches = bf.match(des1,des2)
+    matches_orb = bf_orb.match(des1_orb,des2_orb)
 
     # Sort matches in order of distance
-    matches = sorted(matches, key = lambda x:x.distance)
+    matches_orb = sorted(matches_orb, key = lambda x:x.distance)
 
     # Take only the first 'n' matches (default all when param is zero)
-    if args.num_matches: matches = matches[:args.num_matches]
+    if args.num_matches: matches_orb = matches_orb[:args.num_matches]
 
     # Draw matches
-    opt_therm_sift_match = cv2.drawMatches(rgb_optical_original,kp1,
-                                rgb_thermal_original,kp2,
-                                matches,None,
+    opt_therm_match_orb = cv2.drawMatches(
+                                rgb_optical_original,kp1_orb,
+                                rgb_thermal_original,kp2_orb,
+                                matches_orb,None,
                                 # flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
                                 )
 
     # Show images
-    cv2.imshow('Opt-Therm Match ORB - ' + str(timestamp), opt_therm_sift_match)
+    cv2.imshow('Opt-Therm Match ORB - ' + str(timestamp), opt_therm_match_orb)
     cv2.waitKey()
 
-    # TODO: save images???
+    # Save Image
+    cv2.imwrite(folder_name+"Opt_Therm_Match_ORB-"+str(timestamp) +".png", opt_therm_match_orb)
 
 
 
