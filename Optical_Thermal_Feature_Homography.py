@@ -5,7 +5,6 @@ import shutil
 import h5py                              
 import yaml
 import argparse
-import matplotlib.pyplot as plt
 
 def main(): 
 
@@ -30,6 +29,9 @@ def main():
     dataset_path = os.getcwd() + '/' + config['dir_dataset']
     results_path = os.getcwd() + '/' + config['dir_results']
 
+    # Suppress scienfitic notation for numpy
+    np.set_printoptions(suppress=True)
+
     #----------#
     # Get Data # 
     #----------#
@@ -48,13 +50,18 @@ def main():
     timestamp = timestamp_keys[args.index]
     im_trio   = f[timestamp]
 
-    # ------ Make folder for specific image pair ------ #
+    #------ Make folder for specific image pair ------#
     folder_name = results_path + '/' + timestamp + '/'
 
     # Overwrite existing folder
     if os.path.exists(folder_name):
         shutil.rmtree(folder_name)
     os.makedirs(folder_name)
+
+    #------ Make output results folder ------#
+    output_file = folder_name + 'Output-' + str(timestamp)
+
+    # =====================================================================
 
     #---------#
     # Process # 
@@ -80,6 +87,10 @@ def main():
     
     # Save
     cv2.imwrite(folder_name+"Opt_Therm_Stacked-"+str(timestamp) +".png", opt_therm_stack_original)
+
+
+    # =====================================================================
+
 
     #------#
     # SIFT # 
@@ -136,7 +147,6 @@ def main():
     M_sift, mask_sift = cv2.findHomography(src_pts_sift, dst_pts_sift, cv2.RANSAC) # MODIFIED
     print("SIFT Homography: \n" + str(M_sift))
     
-
     #------- REDRAW INLIERS -------#
     # 1. Draw all matches in red
     opt_therm_match_sift = cv2.drawMatches(rgb_optical_original,kp1_sift,rgb_thermal_original,kp2_sift,matches_sift, None,
@@ -148,13 +158,54 @@ def main():
                                 matchColor = (0,255,0),       # draw matches in green color
                                 matchesMask = mask_sift[:,0],  # draw only inliers
                                 )
-
     # Show images
     cv2.imshow('SIFT Inliers and Outliers - ' + str(timestamp), opt_therm_match_sift)
     cv2.waitKey()
-
     # Save Image
     cv2.imwrite(folder_name+"Opt_Therm_Match_SIFT_Inliers_Outliers-"+str(timestamp) +".png", opt_therm_match_sift)
+
+
+    #------- APPLY HOMOGRAPHY -------#
+    # Compute
+    opt_warped_sift = cv2.warpPerspective(rgb_optical_original, M_sift, rgb_optical_original.T.shape[1:3])
+    # Show
+    cv2.imshow('Optical Warped SIFT - ' + str(timestamp), opt_warped_sift)
+    cv2.waitKey()
+    # Save
+    cv2.imwrite(folder_name+'Optical_Warped_SIFT-'+str(timestamp)+'.png', opt_warped_sift)
+
+    #-------#
+    # ERROR # 
+    #-------#
+    # Pixel location in source and destination should be THE SAME
+    # Error Per Pixel: Euclidean distance b/w source & dest pixel locations
+    # Overall Error: Average
+
+    # (Repeated code) Get source and destination points of matches
+    # src_pts_sift = np.float32([ kp1_sift[m.queryIdx].pt for m in matches_sift ]).reshape(-1,1,2)
+    # dst_pts_sift = np.float32([ kp2_sift[m.trainIdx].pt for m in matches_sift ]).reshape(-1,1,2)
+
+    #------- 1) ALL MATCHES -------#
+    # a) Get euclidean distance b/w corresponding src & dst
+    err_pts_sift = np.linalg.norm(src_pts_sift - dst_pts_sift,axis=2)
+    # print("Err pts: " + str(err_pts_sift))
+
+    # b) Take average of ALL distances for average pixel error
+    err_avg_sift = np.average(err_pts_sift, axis=0)
+    print("Average (ALL) Pixel Error SIFT: " + str(err_avg_sift))
+
+    #------- 2) INLIERS ONLY -------#
+    # c) Multiply errors by mask so inliers remain
+    err_pts_masked_sift = np.multiply(err_pts_sift,mask_sift)
+    # print("Mask Sift: " + str(mask_sift))
+    # print("Err pts masked: " + str(err_pts_masked_sift))
+
+    # d) Average inlier pixel distance (NOTE: must divide by mask total, cant use average)
+    err_avg_masked_sift = np.sum(err_pts_masked_sift, axis=0) / np.sum(mask_sift,axis=0)
+    print("Average (INLIER) Pixel Error SIFT: " + str(err_avg_masked_sift))
+
+
+    # =====================================================================
 
     #-----#
     # ORB # 
@@ -215,6 +266,7 @@ def main():
     M_orb, mask_orb = cv2.findHomography(src_pts_orb, dst_pts_orb, cv2.RANSAC)
     print("ORB Homography: \n" + str(M_orb))
 
+
     #------- REDRAW INLIERS -------#
     # 1. Draw all matches in red
     opt_therm_match_orb = cv2.drawMatches(rgb_optical_original,kp1_orb,rgb_thermal_original,kp2_orb, matches_orb, None,
@@ -226,15 +278,62 @@ def main():
                                 matchColor = (0,255,0),       # draw matches in green color
                                 matchesMask = mask_orb[:,0],  # draw only inliers
                                 )
-
     # Show images
     cv2.imshow('ORB Inliers and Outliers - ' + str(timestamp), opt_therm_match_orb)
     cv2.waitKey()
-
     # Save Image
     cv2.imwrite(folder_name+"Opt_Therm_Match_ORB_Inliers_Outliers-"+str(timestamp) +".png", opt_therm_match_orb)
 
 
+    #------- APPLY HOMOGRAPHY -------#
+    # Compute
+    opt_warped_orb = cv2.warpPerspective(rgb_optical_original, M_orb, rgb_optical_original.T.shape[1:3])
+    # Show
+    cv2.imshow('Optical Warped ORB - ' + str(timestamp), opt_warped_orb)
+    cv2.waitKey()
+    # Save
+    cv2.imwrite(folder_name+'Optical_Warped_ORB-'+str(timestamp)+'.png', opt_warped_orb)
+
+    #-------#
+    # ERROR # 
+    #-------#
+    # Pixel location in source and destination should be THE SAME
+    # Error Per Pixel: Euclidean distance b/w source & dest pixel locations
+    # Overall Error: Average
+
+    # (Repeated code) Get source and destination points of matches
+    # src_pts_orb = np.float32([ kp1_orb[m.queryIdx].pt for m in matches_orb ]).reshape(-1,1,2)
+    # dst_pts_orb = np.float32([ kp2_orb[m.trainIdx].pt for m in matches_orb ]).reshape(-1,1,2)
+
+
+    #------- 1) ALL MATCHES -------#
+    # a) Get euclidean distance b/w corresponding src & dst
+    err_pts_orb = np.linalg.norm(src_pts_orb - dst_pts_orb,axis=2)
+    # print("Err pts: " + str(err_pts_orb))
+
+    # b) Take average of ALL distances for average pixel error
+    err_avg_orb = np.average(err_pts_orb, axis=0)
+    print("Average (ALL) Pixel Error ORB: " + str(err_avg_orb))
+
+    #------- 2) INLIERS ONLY -------#
+    # c) Multiply errors by mask so inliers remain
+    err_pts_masked_orb = np.multiply(err_pts_orb,mask_orb)
+    # print("Mask Orb: " + str(mask_orb))
+    # print("Err pts masked: " + str(err_pts_masked_orb))
+
+    # d) Average inlier pixel distance (NOTE: must divide by mask total, cant use average)
+    err_avg_masked_orb = np.sum(err_pts_masked_orb, axis=0) / np.sum(mask_orb,axis=0)
+    print("Average (INLIER) Pixel Error ORB: " + str(err_avg_masked_orb))
+
+    # =====================================================================
+
+    #-------------#
+    # Save Output #
+    #-------------#
+    np.savez(output_file,
+            M_sift=M_sift, err_avg_sift=err_avg_sift, err_avg_masked_sift=err_avg_masked_sift,
+            M_orb =M_orb , err_avg_orb =err_avg_orb , err_avg_masked_orb =err_avg_masked_orb)
+    
 
 if __name__ == "__main__":
     main()
