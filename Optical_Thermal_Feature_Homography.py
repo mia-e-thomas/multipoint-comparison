@@ -5,6 +5,11 @@ import shutil
 import h5py                              
 import yaml
 import argparse
+import matplotlib.pyplot as plt
+import math
+
+import matplotlib
+matplotlib.use('TKAgg')
 
 def main(): 
 
@@ -32,9 +37,12 @@ def main():
     # Suppress scienfitic notation for numpy
     np.set_printoptions(suppress=True)
 
-    #----------#
-    # Get Data # 
-    #----------#
+    # Manually set parameter
+    hist_bin_size = 10
+
+    #----------------#
+    # Data & Folders # 
+    #----------------#
 
     #------- Get image pair from dataset -------#
     # Open hdf5 file
@@ -181,29 +189,64 @@ def main():
     # Error Per Pixel: Euclidean distance b/w source & dest pixel locations
     # Overall Error: Average
 
-    # (Repeated code) Get source and destination points of matches
-    # src_pts_sift = np.float32([ kp1_sift[m.queryIdx].pt for m in matches_sift ]).reshape(-1,1,2)
-    # dst_pts_sift = np.float32([ kp2_sift[m.trainIdx].pt for m in matches_sift ]).reshape(-1,1,2)
-
     #------- 1) ALL MATCHES -------#
     # a) Get euclidean distance b/w corresponding src & dst
     err_pts_sift = np.linalg.norm(src_pts_sift - dst_pts_sift,axis=2)
-    # print("Err pts: " + str(err_pts_sift))
 
     # b) Take average of ALL distances for average pixel error
     err_avg_sift = np.average(err_pts_sift, axis=0)
     print("Average (ALL) Pixel Error SIFT: " + str(err_avg_sift))
 
     #------- 2) INLIERS ONLY -------#
-    # c) Multiply errors by mask so inliers remain
-    err_pts_masked_sift = np.multiply(err_pts_sift,mask_sift)
-    # print("Mask Sift: " + str(mask_sift))
-    # print("Err pts masked: " + str(err_pts_masked_sift))
+    # c) Take only elements where mask is nonzero
+    err_pts_inlier_sift = err_pts_sift[mask_sift[:,0] != 0, :]
 
-    # d) Average inlier pixel distance (NOTE: must divide by mask total, cant use average)
-    err_avg_masked_sift = np.sum(err_pts_masked_sift, axis=0) / np.sum(mask_sift,axis=0)
-    print("Average (INLIER) Pixel Error SIFT: " + str(err_avg_masked_sift))
+    # d) Average inlier pixel distance 
+    err_avg_inlier_sift = np.average(err_pts_inlier_sift, axis=0) 
+    print("Average (INLIER) Pixel Error SIFT: " + str(err_avg_inlier_sift))
 
+    #------- 3) OUTLIERS ONLY -------#
+    # e) Get outliers
+    err_pts_outlier_sift = err_pts_sift[mask_sift[:,0] == 0,:]
+
+    #-----------#
+    # HISTOGRAM # 
+    #-----------#
+    # Calculate histogram w/ and w/o mask
+
+    # Numpy Method
+    '''
+    # a) Histogram of ALL errors
+    plt.hist(err_pts_sift[:,0], bins=10)
+    plt.show()
+    '''
+
+    # b) Histogram of ONLY inliers
+    max_val = math.ceil(err_pts_inlier_sift[:,0].max())
+    plt.hist(err_pts_inlier_sift[:,0], 
+                bins=max_val, range=[0,max_val],
+                edgecolor='black')
+    plt.xlabel("SIFT Inlier Matching Error (Euclidean Distance in Pixels)", fontsize=12)
+    plt.ylabel("Frequency", fontsize=12)
+    # Save image
+    plt.savefig(folder_name+'Match_Error_Inliers_Hist_SIFT-'+str(timestamp)+'.png')
+    # Show Image
+    plt.show()
+
+    # c) Stacked histogram of inliers and outliers
+    num_bins = math.ceil(err_pts_sift.max()/hist_bin_size) # set bin size to 'hist_bin_size'
+    plt.hist([err_pts_inlier_sift[:,0],err_pts_outlier_sift[:,0]], 
+                bins=num_bins, stacked=True,
+                color=["g","r"], # green inliers red outliers
+                label=['Inliers','Outliers']
+            )
+    plt.legend(prop={'size': 10})
+    plt.xlabel("SIFT Matching Error (Euclidean Distance in Pixels)", fontsize=12)
+    plt.ylabel("Frequency", fontsize=12)
+    # Save image
+    plt.savefig(folder_name+'Match_Error_Stacked_Hist_SIFT-'+str(timestamp)+'.png')
+    # Show Image
+    plt.show()
 
     # =====================================================================
 
@@ -301,29 +344,65 @@ def main():
     # Error Per Pixel: Euclidean distance b/w source & dest pixel locations
     # Overall Error: Average
 
-    # (Repeated code) Get source and destination points of matches
-    # src_pts_orb = np.float32([ kp1_orb[m.queryIdx].pt for m in matches_orb ]).reshape(-1,1,2)
-    # dst_pts_orb = np.float32([ kp2_orb[m.trainIdx].pt for m in matches_orb ]).reshape(-1,1,2)
-
-
     #------- 1) ALL MATCHES -------#
     # a) Get euclidean distance b/w corresponding src & dst
     err_pts_orb = np.linalg.norm(src_pts_orb - dst_pts_orb,axis=2)
-    # print("Err pts: " + str(err_pts_orb))
 
     # b) Take average of ALL distances for average pixel error
     err_avg_orb = np.average(err_pts_orb, axis=0)
     print("Average (ALL) Pixel Error ORB: " + str(err_avg_orb))
 
     #------- 2) INLIERS ONLY -------#
-    # c) Multiply errors by mask so inliers remain
-    err_pts_masked_orb = np.multiply(err_pts_orb,mask_orb)
-    # print("Mask Orb: " + str(mask_orb))
-    # print("Err pts masked: " + str(err_pts_masked_orb))
+    # c) Take only elements where mask is nonzero
+    err_pts_inlier_orb = err_pts_orb[mask_orb[:,0] != 0, :]
 
-    # d) Average inlier pixel distance (NOTE: must divide by mask total, cant use average)
-    err_avg_masked_orb = np.sum(err_pts_masked_orb, axis=0) / np.sum(mask_orb,axis=0)
-    print("Average (INLIER) Pixel Error ORB: " + str(err_avg_masked_orb))
+    # d) Average inlier pixel distance 
+    err_avg_inlier_orb = np.average(err_pts_inlier_orb, axis=0) 
+    print("Average (INLIER) Pixel Error ORB: " + str(err_avg_inlier_orb))
+
+    #------- 3) OUTLIERS ONLY -------#
+    # e) Get outliers
+    err_pts_outlier_orb = err_pts_orb[mask_orb[:,0] == 0,:]
+
+    #-----------#
+    # HISTOGRAM # 
+    #-----------#
+    # Calculate histogram w/ and w/o mask
+
+    # Numpy Method
+    '''
+    # a) Histogram of ALL errors
+    plt.hist(err_pts_orb[:,0], bins=10)
+    plt.show()
+    '''
+    # b) Histogram of ONLY inliers
+    max_val = math.ceil(err_pts_inlier_orb[:,0].max())
+    plt.hist(err_pts_inlier_orb[:,0], 
+                bins=max_val, range=[0,max_val],
+                edgecolor='black')
+    plt.xlabel("ORB Inlier Matching Error (Euclidean Distance in Pixels)", fontsize=12)
+    plt.ylabel("Frequency", fontsize=12)
+    # Save image
+    plt.savefig(folder_name+'Match_Error_Inliers_Hist_ORB-'+str(timestamp)+'.png')
+    # Show Image
+    plt.show()
+
+    # c) Stacked histogram of inliers and outliers
+    num_bins = math.ceil(err_pts_orb.max()/hist_bin_size) # set bin size to 'hist_bin_size'
+    plt.hist([err_pts_inlier_orb[:,0],err_pts_outlier_orb[:,0]], 
+                bins=num_bins, stacked=True,
+                color=["g","r"], # green inliers red outliers
+                label=['Inliers','Outliers']
+            )
+    plt.legend(prop={'size': 10})
+    plt.xlabel("ORB Matching Error (Euclidean Distance in Pixels)", fontsize=12)
+    plt.ylabel("Frequency", fontsize=12)
+
+    # Save image
+    plt.savefig(folder_name+'Match_Error_Stacked_Hist_ORB-'+str(timestamp)+'.png')
+
+    # Show Image
+    plt.show()
 
     # =====================================================================
 
@@ -331,8 +410,8 @@ def main():
     # Save Output #
     #-------------#
     np.savez(output_file,
-            M_sift=M_sift, err_avg_sift=err_avg_sift, err_avg_masked_sift=err_avg_masked_sift,
-            M_orb =M_orb , err_avg_orb =err_avg_orb , err_avg_masked_orb =err_avg_masked_orb)
+            M_sift=M_sift, err_avg_sift=err_avg_sift, err_avg_inlier_sift=err_avg_inlier_sift,
+            M_orb =M_orb , err_avg_orb =err_avg_orb , err_avg_inlier_orb =err_avg_inlier_orb)
     
 
 if __name__ == "__main__":
