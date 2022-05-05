@@ -231,14 +231,17 @@ def main():
     # Save image
     plt.savefig(folder_name+'Match_Error_Inliers_Hist_SIFT-'+str(timestamp)+'.png')
     # Show Image
-    plt.show()
+    plt.draw()
+    plt.waitforbuttonpress(0)
+    plt.close()
 
     # c) Stacked histogram of inliers and outliers
     num_bins = math.ceil(err_pts_sift.max()/hist_bin_size) # set bin size to 'hist_bin_size'
     plt.hist([err_pts_inlier_sift[:,0],err_pts_outlier_sift[:,0]], 
                 bins=num_bins, stacked=True,
                 color=["g","r"], # green inliers red outliers
-                label=['Inliers','Outliers']
+                label=['Inliers','Outliers'],
+                edgecolor='black',
             )
     plt.legend(prop={'size': 10})
     plt.xlabel("SIFT Matching Error (Euclidean Distance in Pixels)", fontsize=12)
@@ -246,7 +249,9 @@ def main():
     # Save image
     plt.savefig(folder_name+'Match_Error_Stacked_Hist_SIFT-'+str(timestamp)+'.png')
     # Show Image
-    plt.show()
+    plt.draw()
+    plt.waitforbuttonpress(0)
+    plt.close()
 
     # =====================================================================
 
@@ -385,14 +390,17 @@ def main():
     # Save image
     plt.savefig(folder_name+'Match_Error_Inliers_Hist_ORB-'+str(timestamp)+'.png')
     # Show Image
-    plt.show()
+    plt.draw()
+    plt.waitforbuttonpress(0)
+    plt.close()
 
     # c) Stacked histogram of inliers and outliers
     num_bins = math.ceil(err_pts_orb.max()/hist_bin_size) # set bin size to 'hist_bin_size'
     plt.hist([err_pts_inlier_orb[:,0],err_pts_outlier_orb[:,0]], 
                 bins=num_bins, stacked=True,
                 color=["g","r"], # green inliers red outliers
-                label=['Inliers','Outliers']
+                label=['Inliers','Outliers'],
+                edgecolor='black',
             )
     plt.legend(prop={'size': 10})
     plt.xlabel("ORB Matching Error (Euclidean Distance in Pixels)", fontsize=12)
@@ -402,7 +410,9 @@ def main():
     plt.savefig(folder_name+'Match_Error_Stacked_Hist_ORB-'+str(timestamp)+'.png')
 
     # Show Image
-    plt.show()
+    plt.draw()
+    plt.waitforbuttonpress(0)
+    plt.close()
 
     # =====================================================================
 
