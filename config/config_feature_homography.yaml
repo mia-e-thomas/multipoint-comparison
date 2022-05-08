@@ -1,3 +1,4 @@
 dir_dataset: ../datasets/multipoint/data/test.hdf5 # test or train
 dir_results: ./image_results/test/        # match test or train
+dir_stats:   ./stats_results/
 
