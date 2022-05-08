@@ -28,7 +28,7 @@ def main():
     # Parameters #
     #------------#
     # Define script arguments
-    parser = argparse.ArgumentParser(description='Temp: show image pair')
+    parser = argparse.ArgumentParser(description='')
     parser.add_argument('-y', '--yaml-config', default='config/config_feature_homography.yaml', help='YAML config file')
     parser.add_argument('-i', '--index', default=500, type=int, help='Index of image pair')
     parser.add_argument('-s', dest='show', action='store_true', help='If set, the prediction the images/plots are displayed')
@@ -296,6 +296,13 @@ def main():
         plt.waitforbuttonpress(0)
         plt.close()
 
+
+        #------- PRINT OTHER STATS -------#
+        print("Total Matches  SIFT: " + str(err_pts_sift.shape[0]))
+        print("Total Inliers  SIFT: " + str(err_pts_inlier_sift.shape[0]))
+        print("Total Outliers SIFT: " + str(err_pts_outlier_sift.shape[0]))
+        print("---------------------------")
+
     # =====================================================================
 
     #-----#
@@ -485,6 +492,12 @@ def main():
         plt.waitforbuttonpress(0)
         plt.close()
 
+        #------- PRINT OTHER STATS -------#
+        print("Total Matches  ORB: " + str(err_pts_orb.shape[0]))
+        print("Total Inliers  ORB: " + str(err_pts_inlier_orb.shape[0]))
+        print("Total Outliers ORB: " + str(err_pts_outlier_orb.shape[0]))
+        print("---------------------------")
+
     # =====================================================================
 
     #-----#
@@ -643,6 +656,12 @@ def main():
         plt.waitforbuttonpress(0)
         plt.close()
 
+        #------- PRINT OTHER STATS -------#
+        print("Total Matches  MFD: " + str(err_pts_mfd.shape[0]))
+        print("Total Inliers  MFD: " + str(err_pts_inlier_mfd.shape[0]))
+        print("Total Outliers MFD: " + str(err_pts_outlier_mfd.shape[0]))
+        print("---------------------------")
+
 
     # =====================================================================
 
@@ -659,6 +678,8 @@ def main():
         err_avg_sift        = -1
         err_avg_inlier_sift = -1
         time_sift           = -1
+        err_pts_sift        = -1
+        mask_sift           = -1
 
     # If sufficient amount of matches, save the data
     if not suff_match_orb: 
@@ -666,6 +687,8 @@ def main():
         err_avg_orb        = -1
         err_avg_inlier_orb = -1
         time_orb           = -1
+        err_pts_orb        = -1
+        mask_orb           = -1
 
     # If sufficient amount of matches, save the data
     if not suff_match_mfd: 
@@ -673,11 +696,27 @@ def main():
         err_avg_mfd        = -1
         err_avg_inlier_mfd = -1
         time_mfd           = -1
+        err_pts_mfd        = -1
+        mask_mfd           = -1
 
+
+    # Params to save
+    # 1. Homography:               M_{}
+    # 2. Average Pt Error:         err_avg_{}
+    # 3. Average Inlier Error:     err_avg_inlier_{}
+    # 4. Computation Time:         time_{}
+    # 5. All Error Points (array): err_pts_{}
+    # 6. Mask of inliers/outliers: mask_{}
     np.savez(output_file, 
+        # SIFT
         M_sift=M_sift, err_avg_sift=err_avg_sift, err_avg_inlier_sift=err_avg_inlier_sift, time_sift=time_sift,
+        err_pts_sift=err_pts_sift, mask_sift=mask_sift,
+        # ORB
         M_orb=M_orb,  err_avg_orb=err_avg_orb,  err_avg_inlier_orb=err_avg_inlier_orb, time_orb=time_orb,
+        err_pts_orb=err_pts_orb, mask_orb=mask_orb,
+        # MFD
         M_mfd=M_mfd,  err_avg_mfd=err_avg_mfd,  err_avg_inlier_mfd=err_avg_inlier_mfd, time_mfd=time_mfd,
+        err_pts_mfd=err_pts_mfd, mask_mfd=mask_mfd,
     )
 
 if __name__ == "__main__":
