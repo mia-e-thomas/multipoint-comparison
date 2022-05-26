@@ -106,6 +106,7 @@ def main():
     if args.show:
         cv2.imshow('Optical (L) & Thermal (R) - ' + str(timestamp), opt_therm_stack_original)
         cv2.waitKey()
+        cv2.destroyWindow('Optical (L) & Thermal (R) - ' + str(timestamp))
     
     # Save
     cv2.imwrite(folder_name+"Opt_Therm_Stacked-"+str(timestamp) +".png", opt_therm_stack_original)
@@ -173,6 +174,7 @@ def main():
     # Show images
     cv2.imshow('Opt-Therm Match SIFT - ' + str(timestamp), opt_therm_match_sift)
     cv2.waitKey()
+    cv2.destroyWindow('Opt-Therm Match SIFT - ' + str(timestamp))
 
     # Save Image
     cv2.imwrite(folder_name+"Opt_Therm_Match_SIFT-"+str(timestamp) +".png", opt_therm_match_sift)
@@ -181,127 +183,6 @@ def main():
     time_sift = time.process_time() - start_sift
     print("SIFT time (s): " + str(time_sift))
 
-    #------- MIN # MATCHES -------#
-
-    # Check for minimum 4 matches (for homography)
-    suff_match_sift = False
-    if len(matches_sift) > 3: suff_match_sift = True
-    
-    if not suff_match_sift:
-        print("Insufficient SIFT Matches (" + str(len(matches_sift)) + ") to compute homography")
-
-    else: 
-
-        #------- HOMOGRAPHY -------#
-        src_pts_sift = np.float32([ kp1_sift[m.queryIdx].pt for m in matches_sift ]).reshape(-1,1,2)
-        dst_pts_sift = np.float32([ kp2_sift[m.trainIdx].pt for m in matches_sift ]).reshape(-1,1,2)
-        M_sift, mask_sift = cv2.findHomography(src_pts_sift, dst_pts_sift, cv2.RANSAC) # MODIFIED
-        print("SIFT Homography: \n" + str(M_sift))
-        
-        #------- REDRAW INLIERS -------#
-        # 1. Draw all matches in red
-        opt_therm_match_sift = cv2.drawMatches(rgb_optical_original,kp1_sift,rgb_thermal_original,kp2_sift,matches_sift, None,
-                                    matchColor = (0,0,255),       # draw matches in red color
-                                    )
-        # 2. Draw inliers in green 
-        w = int(opt_therm_match_sift.shape[1]/2)
-        opt_therm_match_sift = cv2.drawMatches(opt_therm_match_sift[:,:w,:],kp1_sift,opt_therm_match_sift[:,w:,:],kp2_sift,matches_sift, None,
-                                    matchColor = (0,255,0),       # draw matches in green color
-                                    matchesMask = mask_sift[:,0],  # draw only inliers
-                                    )
-        # Show images
-        cv2.imshow('SIFT Inliers and Outliers - ' + str(timestamp), opt_therm_match_sift)
-        cv2.waitKey()
-        # Save Image
-        cv2.imwrite(folder_name+"Opt_Therm_Match_SIFT_Inliers_Outliers-"+str(timestamp) +".png", opt_therm_match_sift)
-
-
-        #------- APPLY HOMOGRAPHY -------#
-        # Compute
-        opt_warped_sift = cv2.warpPerspective(rgb_optical_original, M_sift, rgb_optical_original.T.shape[1:3])
-        # Show
-        cv2.imshow('Optical Warped SIFT - ' + str(timestamp), opt_warped_sift)
-        cv2.waitKey()
-        # Save
-        cv2.imwrite(folder_name+'Optical_Warped_SIFT-'+str(timestamp)+'.png', opt_warped_sift)
-
-        #-------#
-        # ERROR # 
-        #-------#
-        # Pixel location in source and destination should be THE SAME
-        # Error Per Pixel: Euclidean distance b/w source & dest pixel locations
-        # Overall Error: Average
-
-        #------- 1) ALL MATCHES -------#
-        # a) Get euclidean distance b/w corresponding src & dst
-        err_pts_sift = np.linalg.norm(src_pts_sift - dst_pts_sift,axis=2)
-
-        # b) Take average of ALL distances for average pixel error
-        err_avg_sift = np.average(err_pts_sift, axis=0)
-        print("Average (ALL) Pixel Error SIFT: " + str(err_avg_sift))
-
-        #------- 2) INLIERS ONLY -------#
-        # c) Take only elements where mask is nonzero
-        err_pts_inlier_sift = err_pts_sift[mask_sift[:,0] != 0, :]
-
-        # d) Average inlier pixel distance 
-        err_avg_inlier_sift = np.average(err_pts_inlier_sift, axis=0) 
-        print("Average (INLIER) Pixel Error SIFT: " + str(err_avg_inlier_sift))
-
-        #------- 3) OUTLIERS ONLY -------#
-        # e) Get outliers
-        err_pts_outlier_sift = err_pts_sift[mask_sift[:,0] == 0,:]
-
-        #-----------#
-        # HISTOGRAM # 
-        #-----------#
-        # Calculate histogram w/ and w/o mask
-
-        # Numpy Method
-        '''
-        # a) Histogram of ALL errors
-        plt.hist(err_pts_sift[:,0], bins=10)
-        plt.show()
-        '''
-
-        # b) Histogram of ONLY inliers
-        max_val = math.ceil(err_pts_inlier_sift[:,0].max())
-        plt.hist(err_pts_inlier_sift[:,0], 
-                    bins=max_val, range=[0,max_val],
-                    edgecolor='black')
-        plt.xlabel("SIFT Inlier Matching Error (Euclidean Distance in Pixels)", fontsize=12)
-        plt.ylabel("Frequency", fontsize=12)
-        # Save image
-        plt.savefig(folder_name+'Match_Error_Inliers_Hist_SIFT-'+str(timestamp)+'.png')
-        # Show Image
-        plt.draw()
-        plt.waitforbuttonpress(0)
-        plt.close()
-
-        # c) Stacked histogram of inliers and outliers
-        num_bins = math.ceil(err_pts_sift.max()/hist_bin_size) # set bin size to 'hist_bin_size'
-        plt.hist([err_pts_inlier_sift[:,0],err_pts_outlier_sift[:,0]], 
-                    bins=num_bins, stacked=True,
-                    color=["g","r"], # green inliers red outliers
-                    label=['Inliers','Outliers'],
-                    edgecolor='black',
-                )
-        plt.legend(prop={'size': 10})
-        plt.xlabel("SIFT Matching Error (Euclidean Distance in Pixels)", fontsize=12)
-        plt.ylabel("Frequency", fontsize=12)
-        # Save image
-        plt.savefig(folder_name+'Match_Error_Stacked_Hist_SIFT-'+str(timestamp)+'.png')
-        # Show Image
-        plt.draw()
-        plt.waitforbuttonpress(0)
-        plt.close()
-
-
-        #------- PRINT OTHER STATS -------#
-        print("Total Matches  SIFT: " + str(err_pts_sift.shape[0]))
-        print("Total Inliers  SIFT: " + str(err_pts_inlier_sift.shape[0]))
-        print("Total Outliers SIFT: " + str(err_pts_outlier_sift.shape[0]))
-        print("---------------------------")
 
     # =====================================================================
 
@@ -329,7 +210,7 @@ def main():
                          nfeatures = max_features, # SET MAX features to bound matching time
                          )
 
-    # Find SIFT keypoints and descriptors
+    # Find keypoints and descriptors
     kp1_orb, des1_orb = orb.detectAndCompute(rgb_optical_original,None)
     kp2_orb, des2_orb = orb.detectAndCompute(rgb_thermal_original,None)
 
@@ -367,6 +248,7 @@ def main():
     # Show images
     cv2.imshow('Opt-Therm Match ORB - ' + str(timestamp), opt_therm_match_orb)
     cv2.waitKey()
+    cv2.destroyWindow('Opt-Therm Match ORB - ' + str(timestamp))
 
     # Save Image
     cv2.imwrite(folder_name+"Opt_Therm_Match_ORB-"+str(timestamp) +".png", opt_therm_match_orb)
@@ -374,129 +256,6 @@ def main():
     #------- TIMING -------#
     time_orb = time.process_time() - start_orb
     print("ORB time (s): " + str(time_orb))
-
-    #------- MIN # MATCHES -------#
-
-    # Check for minimum 4 matches (for homography)
-    suff_match_orb = False
-    if len(matches_orb) > 3: suff_match_orb = True
-    
-    if not suff_match_orb:
-        print("Insufficient ORB Matches (" + str(len(matches_orb)) + ") to compute homography")
-
-    else: 
-
-        #------- HOMOGRAPHY -------#
-        src_pts_orb = np.float32([ kp1_orb[m.queryIdx].pt for m in matches_orb ]).reshape(-1,1,2)
-        dst_pts_orb = np.float32([ kp2_orb[m.trainIdx].pt for m in matches_orb ]).reshape(-1,1,2)
-        M_orb, mask_orb = cv2.findHomography(src_pts_orb, dst_pts_orb, cv2.RANSAC)
-        print("ORB Homography: \n" + str(M_orb))
-
-
-        #------- REDRAW INLIERS -------#
-        # 1. Draw all matches in red
-        opt_therm_match_orb = cv2.drawMatches(rgb_optical_original,kp1_orb,rgb_thermal_original,kp2_orb, matches_orb, None,
-                                    matchColor = (0,0,255), # draw matches in red color
-                                    )
-        # 2. Draw inliers in green 
-        w = int(opt_therm_match_orb.shape[1]/2)
-        opt_therm_match_orb = cv2.drawMatches(opt_therm_match_orb[:,:w,:],kp1_orb,opt_therm_match_orb[:,w:,:],kp2_orb,matches_orb, None,
-                                    matchColor = (0,255,0),       # draw matches in green color
-                                    matchesMask = mask_orb[:,0],  # draw only inliers
-                                    )
-        # Show images
-        cv2.imshow('ORB Inliers and Outliers - ' + str(timestamp), opt_therm_match_orb)
-        cv2.waitKey()
-        # Save Image
-        cv2.imwrite(folder_name+"Opt_Therm_Match_ORB_Inliers_Outliers-"+str(timestamp) +".png", opt_therm_match_orb)
-
-
-        #------- APPLY HOMOGRAPHY -------#
-        # Compute
-        opt_warped_orb = cv2.warpPerspective(rgb_optical_original, M_orb, rgb_optical_original.T.shape[1:3])
-        # Show
-        cv2.imshow('Optical Warped ORB - ' + str(timestamp), opt_warped_orb)
-        cv2.waitKey()
-        # Save
-        cv2.imwrite(folder_name+'Optical_Warped_ORB-'+str(timestamp)+'.png', opt_warped_orb)
-
-        #-------#
-        # ERROR # 
-        #-------#
-        # Pixel location in source and destination should be THE SAME
-        # Error Per Pixel: Euclidean distance b/w source & dest pixel locations
-        # Overall Error: Average
-
-        #------- 1) ALL MATCHES -------#
-        # a) Get euclidean distance b/w corresponding src & dst
-        err_pts_orb = np.linalg.norm(src_pts_orb - dst_pts_orb,axis=2)
-
-        # b) Take average of ALL distances for average pixel error
-        err_avg_orb = np.average(err_pts_orb, axis=0)
-        print("Average (ALL) Pixel Error ORB: " + str(err_avg_orb))
-
-        #------- 2) INLIERS ONLY -------#
-        # c) Take only elements where mask is nonzero
-        err_pts_inlier_orb = err_pts_orb[mask_orb[:,0] != 0, :]
-
-        # d) Average inlier pixel distance 
-        err_avg_inlier_orb = np.average(err_pts_inlier_orb, axis=0) 
-        print("Average (INLIER) Pixel Error ORB: " + str(err_avg_inlier_orb))
-
-        #------- 3) OUTLIERS ONLY -------#
-        # e) Get outliers
-        err_pts_outlier_orb = err_pts_orb[mask_orb[:,0] == 0,:]
-
-        #-----------#
-        # HISTOGRAM # 
-        #-----------#
-        # Calculate histogram w/ and w/o mask
-
-        # Numpy Method
-        '''
-        # a) Histogram of ALL errors
-        plt.hist(err_pts_orb[:,0], bins=10)
-        plt.show()
-        '''
-        # b) Histogram of ONLY inliers
-        max_val = math.ceil(err_pts_inlier_orb[:,0].max())
-        plt.hist(err_pts_inlier_orb[:,0], 
-                    bins=max_val, range=[0,max_val],
-                    edgecolor='black')
-        plt.xlabel("ORB Inlier Matching Error (Euclidean Distance in Pixels)", fontsize=12)
-        plt.ylabel("Frequency", fontsize=12)
-        # Save image
-        plt.savefig(folder_name+'Match_Error_Inliers_Hist_ORB-'+str(timestamp)+'.png')
-        # Show Image
-        plt.draw()
-        plt.waitforbuttonpress(0)
-        plt.close()
-
-        # c) Stacked histogram of inliers and outliers
-        num_bins = math.ceil(err_pts_orb.max()/hist_bin_size) # set bin size to 'hist_bin_size'
-        plt.hist([err_pts_inlier_orb[:,0],err_pts_outlier_orb[:,0]], 
-                    bins=num_bins, stacked=True,
-                    color=["g","r"], # green inliers red outliers
-                    label=['Inliers','Outliers'],
-                    edgecolor='black',
-                )
-        plt.legend(prop={'size': 10})
-        plt.xlabel("ORB Matching Error (Euclidean Distance in Pixels)", fontsize=12)
-        plt.ylabel("Frequency", fontsize=12)
-
-        # Save image
-        plt.savefig(folder_name+'Match_Error_Stacked_Hist_ORB-'+str(timestamp)+'.png')
-
-        # Show Image
-        plt.draw()
-        plt.waitforbuttonpress(0)
-        plt.close()
-
-        #------- PRINT OTHER STATS -------#
-        print("Total Matches  ORB: " + str(err_pts_orb.shape[0]))
-        print("Total Inliers  ORB: " + str(err_pts_inlier_orb.shape[0]))
-        print("Total Outliers ORB: " + str(err_pts_outlier_orb.shape[0]))
-        print("---------------------------")
 
     # =====================================================================
 
@@ -530,6 +289,7 @@ def main():
     # Show image
     cv2.imshow('Opt-Therm Match MFD - ' + str(timestamp), opt_term_match_mfd)
     cv2.waitKey()
+    cv2.destroyWindow('Opt-Therm Match MFD - ' + str(timestamp))
 
     # Save image
     cv2.imwrite(folder_name+"Opt_Therm_Match_MFD-"+str(timestamp) +".png", opt_term_match_mfd)
@@ -539,185 +299,144 @@ def main():
     time_mfd = time.process_time() - start_mfd
     print("MFD time (s): " + str(time_mfd))
 
-
-    #------- MIN # MATCHES -------#
-
-    # Check for minimum 4 matches (for homography)
-    suff_match_mfd = False
-    if len(matches_mfd) > 3: suff_match_mfd = True
     
-    if not suff_match_mfd:
-        print("Insufficient MFD Matches (" + str(len(matches_mfd)) + ") to compute homography")
+    # =====================================================================
 
-    else: 
-
-        #------- HOMOGRAPHY -------#
-        src_pts_mfd = np.float32([ kp1_mfd[m.queryIdx].pt for m in matches_mfd]).reshape(-1,1,2)
-        dst_pts_mfd = np.float32([ kp2_mfd[m.trainIdx].pt for m in matches_mfd]).reshape(-1,1,2)
-        
-        M_mfd, mask_mfd = cv2.findHomography(src_pts_mfd, dst_pts_mfd, cv2.RANSAC) # MODIFIED
-        print("MFD Homography: \n" + str(M_mfd))
-
-        #------- REDRAW INLIERS -------#
-        # 1. Draw all matches in red
-        opt_therm_match_mfd = cv2.drawMatches(rgb_optical_original,kp1_mfd,rgb_thermal_original,kp2_mfd,matches_mfd, None,
-                                    matchColor = (0,0,255),       # draw matches in red color
-                                    )
-        # 2. Draw inliers in green 
-        w = int(opt_therm_match_mfd.shape[1]/2)
-        opt_therm_match_mfd = cv2.drawMatches(opt_therm_match_mfd[:,:w,:],kp1_mfd,opt_therm_match_mfd[:,w:,:],kp2_mfd,matches_mfd, None,
-                                    matchColor = (0,255,0),       # draw matches in green color
-                                    matchesMask = mask_mfd[:,0],  # draw only inliers
-                                    )
-        # Show images
-        cv2.imshow('MFD Inliers and Outliers - ' + str(timestamp), opt_therm_match_mfd)
-        cv2.waitKey()
-        # Save Image
-        cv2.imwrite(folder_name+"Opt_Therm_Match_MFD_Inliers_Outliers-"+str(timestamp) +".png", opt_therm_match_mfd)
-
-        #------- APPLY HOMOGRAPHY -------#
-        # Compute
-        opt_warped_mfd = cv2.warpPerspective(rgb_optical_original, M_mfd, rgb_optical_original.T.shape[1:3])
-        # Show
-        cv2.imshow('Optical Warped MFD - ' + str(timestamp), opt_warped_mfd)
-        cv2.waitKey()
-        # Save
-        cv2.imwrite(folder_name+'Optical_Warped_MFD-'+str(timestamp)+'.png', opt_warped_mfd)
-
-        #-------#
-        # ERROR # 
-        #-------#
-        # Pixel location in source and destination should be THE SAME
-        # Error Per Pixel: Euclidean distance b/w source & dest pixel locations
-        # Overall Error: Average
-
-        #------- 1) ALL MATCHES -------#
-        # a) Get euclidean distance b/w corresponding src & dst
-        err_pts_mfd = np.linalg.norm(src_pts_mfd - dst_pts_mfd,axis=2)
-
-        # b) Take average of ALL distances for average pixel error
-        err_avg_mfd = np.average(err_pts_mfd, axis=0)
-        print("Average (ALL) Pixel Error MFD: " + str(err_avg_mfd))
-
-        #------- 2) INLIERS ONLY -------#
-        # c) Take only elements where mask is nonzero
-        err_pts_inlier_mfd = err_pts_mfd[mask_mfd[:,0] != 0, :]
-
-        # d) Average inlier pixel distance 
-        err_avg_inlier_mfd = np.average(err_pts_inlier_mfd, axis=0) 
-        print("Average (INLIER) Pixel Error MFD: " + str(err_avg_inlier_mfd))
-
-        #------- 3) OUTLIERS ONLY -------#
-        # e) Get outliers
-        err_pts_outlier_mfd = err_pts_mfd[mask_mfd[:,0] == 0,:]
-
-        #-----------#
-        # HISTOGRAM # 
-        #-----------#
-        # Calculate histogram w/ and w/o mask
-
-        # Numpy Method
-        '''
-        # a) Histogram of ALL errors
-        plt.hist(err_pts_mfd[:,0], bins=10)
-        plt.show()
-        '''
-        # b) Histogram of ONLY inliers
-        max_val = math.ceil(err_pts_inlier_mfd[:,0].max())
-        plt.hist(err_pts_inlier_mfd[:,0], 
-                    bins=max_val, range=[0,max_val],
-                    edgecolor='black')
-        plt.xlabel("MFD Inlier Matching Error (Euclidean Distance in Pixels)", fontsize=12)
-        plt.ylabel("Frequency", fontsize=12)
-        # Save image
-        plt.savefig(folder_name+'Match_Error_Inliers_Hist_MFD-'+str(timestamp)+'.png')
-        # Show Image
-        plt.draw()
-        plt.waitforbuttonpress(0)
-        plt.close()
-
-        # c) Stacked histogram of inliers and outliers
-        num_bins = math.ceil(err_pts_mfd.max()/hist_bin_size) # set bin size to 'hist_bin_size'
-        plt.hist([err_pts_inlier_mfd[:,0],err_pts_outlier_mfd[:,0]], 
-                    bins=num_bins, stacked=True,
-                    color=["g","r"], # green inliers red outliers
-                    label=['Inliers','Outliers'],
-                    edgecolor='black',
-                )
-        plt.legend(prop={'size': 10})
-        plt.xlabel("MFD Matching Error (Euclidean Distance in Pixels)", fontsize=12)
-        plt.ylabel("Frequency", fontsize=12)
-
-        # Save image
-        plt.savefig(folder_name+'Match_Error_Stacked_Hist_MFD-'+str(timestamp)+'.png')
-
-        # Show Image
-        plt.draw()
-        plt.waitforbuttonpress(0)
-        plt.close()
-
-        #------- PRINT OTHER STATS -------#
-        print("Total Matches  MFD: " + str(err_pts_mfd.shape[0]))
-        print("Total Inliers  MFD: " + str(err_pts_inlier_mfd.shape[0]))
-        print("Total Outliers MFD: " + str(err_pts_outlier_mfd.shape[0]))
-        print("---------------------------")
-
+    matches_tot = [matches_sift, matches_orb, matches_mfd]
+    kp1_tot     = [kp1_sift    , kp1_orb    , kp1_mfd    ]
+    kp2_tot     = [kp2_sift    , kp2_orb    , kp2_mfd    ]
+    name_tot    = ['SIFT'      , 'ORB'      , 'MFD'      ]
 
     # =====================================================================
 
-    #-------------#
-    # Save Output #
-    #-------------#
-    
-    # I'm going to be incredibly lazy with this because i want to go home
-    # Anything that is not defined will be saved as -1
+    for index in np.arange(len(matches_tot)): 
+    # for (matches, kp1, kp2) in (matches_tot,kp1_tot,kp2_tot):
 
-    # If sufficient amount of matches, save the data
-    if not suff_match_sift: 
-        M_sift              = -1
-        err_avg_sift        = -1
-        err_avg_inlier_sift = -1
-        time_sift           = -1
-        err_pts_sift        = -1
-        mask_sift           = -1
+        matches = matches_tot[index]
+        kp1     = kp1_tot[index]
+        kp2     = kp2_tot[index]
+        name    = name_tot[index]
 
-    # If sufficient amount of matches, save the data
-    if not suff_match_orb: 
-        M_orb              = -1
-        err_avg_orb        = -1
-        err_avg_inlier_orb = -1
-        time_orb           = -1
-        err_pts_orb        = -1
-        mask_orb           = -1
+        #------- MIN # MATCHES -------#
 
-    # If sufficient amount of matches, save the data
-    if not suff_match_mfd: 
-        M_mfd              = -1
-        err_avg_mfd        = -1
-        err_avg_inlier_mfd = -1
-        time_mfd           = -1
-        err_pts_mfd        = -1
-        mask_mfd           = -1
+        # Check for minimum 4 matches (for homography)
+        suff_match = False
+        if len(matches) > 3: suff_match = True
+        
+        if not suff_match:
+            print("Insufficient Matches (" + str(len(matches)) + ") to compute homography")
+
+        else: 
+
+            #------- HOMOGRAPHY -------#
+            src_pts = np.float32([ kp1[m.queryIdx].pt for m in matches ]).reshape(-1,1,2)
+            dst_pts = np.float32([ kp2[m.trainIdx].pt for m in matches ]).reshape(-1,1,2)
+            M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC) # MODIFIED
+            print(name + " Homography: \n" + str(M))
+            
+            #------- REDRAW INLIERS -------#
+            # 1. Draw all matches in red
+            opt_therm_match = cv2.drawMatches(rgb_optical_original,kp1,rgb_thermal_original,kp2,matches, None,
+                                        matchColor = (0,0,255),       # draw matches in red color
+                                        )
+            # 2. Draw inliers in green 
+            w = int(opt_therm_match.shape[1]/2)
+            opt_therm_match = cv2.drawMatches(opt_therm_match[:,:w,:],kp1,opt_therm_match[:,w:,:],kp2,matches, None,
+                                        matchColor = (0,255,0),       # draw matches in green color
+                                        matchesMask = mask[:,0],  # draw only inliers
+                                        )
+            # Show images
+            cv2.imshow(name + ' Inliers and Outliers - ' + str(timestamp), opt_therm_match)
+            cv2.waitKey()
+            cv2.destroyWindow(name + ' Inliers and Outliers - ' + str(timestamp))
+            # Save Image
+            cv2.imwrite(folder_name+"Opt_Therm_Match_" + name + "_Inliers_Outliers-"+str(timestamp) +".png", opt_therm_match)
 
 
-    # Params to save
-    # 1. Homography:               M_{}
-    # 2. Average Pt Error:         err_avg_{}
-    # 3. Average Inlier Error:     err_avg_inlier_{}
-    # 4. Computation Time:         time_{}
-    # 5. All Error Points (array): err_pts_{}
-    # 6. Mask of inliers/outliers: mask_{}
-    np.savez(output_file, 
-        # SIFT
-        M_sift=M_sift, err_avg_sift=err_avg_sift, err_avg_inlier_sift=err_avg_inlier_sift, time_sift=time_sift,
-        err_pts_sift=err_pts_sift, mask_sift=mask_sift,
-        # ORB
-        M_orb=M_orb,  err_avg_orb=err_avg_orb,  err_avg_inlier_orb=err_avg_inlier_orb, time_orb=time_orb,
-        err_pts_orb=err_pts_orb, mask_orb=mask_orb,
-        # MFD
-        M_mfd=M_mfd,  err_avg_mfd=err_avg_mfd,  err_avg_inlier_mfd=err_avg_inlier_mfd, time_mfd=time_mfd,
-        err_pts_mfd=err_pts_mfd, mask_mfd=mask_mfd,
-    )
+            #------- APPLY HOMOGRAPHY -------#
+            # Compute
+            opt_warped = cv2.warpPerspective(rgb_optical_original, M, rgb_optical_original.T.shape[1:3])
+            # Show
+            cv2.imshow('Optical Warped '+name+' - ' + str(timestamp), opt_warped)
+            cv2.waitKey()
+            cv2.destroyWindow('Optical Warped '+name+' - ' + str(timestamp))
+            # Save
+            cv2.imwrite(folder_name+'Optical_Warped_'+name+'-'+str(timestamp)+'.png', opt_warped)
+
+            #-------#
+            # ERROR # 
+            #-------#
+            # Pixel location in source and destination should be THE SAME
+            # Error Per Pixel: Euclidean distance b/w source & dest pixel locations
+            # Overall Error: Average
+
+            #------- 1) ALL MATCHES -------#
+            # a) Get euclidean distance b/w corresponding src & dst
+            err_pts = np.linalg.norm(src_pts - dst_pts,axis=2)
+
+            # b) Take average of ALL distances for average pixel error
+            err_avg = np.average(err_pts, axis=0)
+            print("Average (ALL) Pixel Error "+name+": " + str(err_avg))
+
+            #------- 2) INLIERS ONLY -------#
+            # c) Take only elements where mask is nonzero
+            err_pts_inlier = err_pts[mask[:,0] != 0, :]
+
+            # d) Average inlier pixel distance 
+            err_avg_inlier = np.average(err_pts_inlier, axis=0) 
+            print("Average (INLIER) Pixel Error "+name+": " + str(err_avg_inlier))
+
+            #------- 3) OUTLIERS ONLY -------#
+            # e) Get outliers
+            err_pts_outlier = err_pts[mask[:,0] == 0,:]
+
+            #-----------#
+            # HISTOGRAM # 
+            #-----------#
+            # Calculate histogram w/ and w/o mask
+            
+            # b) Histogram of ONLY inliers
+            max_val = math.ceil(err_pts_inlier[:,0].max())
+            plt.hist(err_pts_inlier[:,0], 
+                        bins=max_val, range=[0,max_val],
+                        edgecolor='black')
+            plt.xlabel(name+" Inlier Matching Error (Euclidean Distance in Pixels)", fontsize=12)
+            plt.ylabel("Frequency", fontsize=12)
+            # Save image
+            plt.savefig(folder_name+'Match_Error_Inliers_Hist_'+name+'-'+str(timestamp)+'.png')
+            # Show Image
+            plt.draw()
+            plt.waitforbuttonpress(0)
+            plt.clf()
+            # plt.close()
+
+            # c) Stacked histogram of inliers and outliers
+            num_bins = math.ceil(err_pts.max()/hist_bin_size) # set bin size to 'hist_bin_size'
+            plt.hist([err_pts_inlier[:,0],err_pts_outlier[:,0]], 
+                        bins=num_bins, stacked=True,
+                        color=["g","r"], # green inliers red outliers
+                        label=['Inliers','Outliers'],
+                        edgecolor='black',
+                    )
+            plt.legend(prop={'size': 10})
+            plt.xlabel(name+" Matching Error (Euclidean Distance in Pixels)", fontsize=12)
+            plt.ylabel("Frequency", fontsize=12)
+            # Save image
+            plt.savefig(folder_name+'Match_Error_Stacked_Hist_'+name+'-'+str(timestamp)+'.png')
+            # Show Image
+            plt.draw()
+            plt.waitforbuttonpress(0)
+            plt.clf()
+            # plt.close()
+
+
+            #------- PRINT OTHER STATS -------#
+            print("Total Matches  "+name+": " + str(err_pts.shape[0]))
+            print("Total Inliers  "+name+": " + str(err_pts_inlier.shape[0]))
+            print("Total Outliers "+name+": " + str(err_pts_outlier.shape[0]))
+            print("---------------------------")
+
+    # =====================================================================
 
 if __name__ == "__main__":
     main()
